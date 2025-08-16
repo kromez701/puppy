@@ -7990,4 +7990,372 @@
       replaceDollarInDOM();
     }, 500);
   </script>
+
+  <script>
+    // Configuration for pricing and URLs
+    const productConfig = {
+      offers: {
+        "1 PuppyPad": {
+          price: "$29.99",
+          numericPrice: 29.99,
+          url: "/checkout/single-pad",
+          quantity: 1,
+        },
+        "Buy 3 Get 3 Free": {
+          price: "$49.99",
+          numericPrice: 49.99,
+          originalPrice: "$300",
+          savings: "$250.01",
+          url: "/checkout/buy3-get3",
+          quantity: 6,
+        },
+        "Buy 2 Get 1 Free": {
+          price: "$39.99",
+          numericPrice: 39.99,
+          originalPrice: "$150",
+          savings: "$110.01",
+          url: "/checkout/buy2-get1",
+          quantity: 3,
+        },
+      },
+      sizes: ["Small", "Medium", "Large"],
+      colors: ["Gray", "White"],
+    };
+
+    class ProductConfiguratorSystem {
+      constructor() {
+        this.currentSize = "Small";
+        this.currentColor = "White";
+        this.currentOffer = "Buy 3 Get 3 Free";
+        this.updatePending = false;
+        this.init();
+      }
+
+      init() {
+        this.detectCurrentSelections();
+        this.updateOfferPrices();
+        this.bindEvents();
+        this.updateAddToCartButton();
+      }
+
+      detectCurrentSelections() {
+        // Detect current size selection
+        const activeSize = document.querySelector(".size-option.active");
+        if (activeSize) {
+          this.currentSize = activeSize.dataset.sizeName;
+        }
+
+        // Detect current color selection
+        const activeColor = document.querySelector(".color-option.active");
+        if (activeColor) {
+          this.currentColor = activeColor.dataset.colorName;
+        }
+
+        // Detect current offer selection
+        const activeOffer = document.querySelector(".offer-option.active");
+        if (activeOffer) {
+          this.currentOffer = activeOffer.dataset.offerName;
+        }
+      }
+
+      updateOfferPrices() {
+        // Update prices in offer options without flickering
+        const offerOptions = document.querySelectorAll(".offer-option");
+
+        offerOptions.forEach((option) => {
+          const offerName = option.dataset.offerName;
+          const config = productConfig.offers[offerName];
+
+          if (!config) return;
+
+          // Update the data-price attribute
+          option.dataset.price = config.numericPrice;
+
+          // Update main price
+          const mainPriceSpan = option.querySelector(
+            ".offer-price [data-cc-price]"
+          );
+          if (mainPriceSpan) {
+            mainPriceSpan.textContent = config.price;
+            mainPriceSpan.dataset.ccPrice = config.numericPrice;
+          }
+
+          // Update compare price if exists
+          const comparePriceSpan = option.querySelector(
+            ".compare-price [data-cc-price]"
+          );
+          if (comparePriceSpan && config.originalPrice) {
+            comparePriceSpan.textContent = config.originalPrice;
+          }
+
+          // Update savings if exists
+          const savingsSpan = option.querySelector(
+            ".saving-tag [data-cc-price]"
+          );
+          if (savingsSpan && config.savings) {
+            savingsSpan.textContent = config.savings;
+          }
+        });
+      }
+
+      bindEvents() {
+        // Handle size selection
+        document.addEventListener(
+          "click",
+          (e) => {
+            const sizeOption = e.target.closest(".size-option");
+            if (sizeOption) {
+              this.selectSize(sizeOption);
+            }
+
+            // Handle color selection
+            const colorOption = e.target.closest(".color-option");
+            if (colorOption) {
+              this.selectColor(colorOption);
+            }
+
+            // Handle offer selection
+            const offerOption = e.target.closest(".offer-option");
+            if (offerOption) {
+              this.selectOffer(offerOption);
+            }
+
+            // Handle add to cart button
+            const addToCartBtn = e.target.closest(".add-to-cart-btn");
+            if (addToCartBtn) {
+              e.preventDefault();
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.handleAddToCart();
+              return false;
+            }
+          },
+          true
+        );
+
+        // Prevent form submissions that might interfere
+        document.addEventListener(
+          "submit",
+          (e) => {
+            if (e.target.querySelector(".add-to-cart-btn")) {
+              e.preventDefault();
+              e.stopPropagation();
+              this.handleAddToCart();
+              return false;
+            }
+          },
+          true
+        );
+
+        // Handle any route() function calls
+        window.originalRoute = window.route;
+        window.route = (event) => {
+          if (
+            event &&
+            event.target &&
+            event.target.closest(".add-to-cart-btn")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.handleAddToCart();
+            return false;
+          }
+          // Call original route function if it exists and it's not our button
+          if (
+            window.originalRoute &&
+            typeof window.originalRoute === "function"
+          ) {
+            return window.originalRoute(event);
+          }
+        };
+      }
+
+      selectSize(sizeOption) {
+        // Remove active class from all size options
+        document.querySelectorAll(".size-option").forEach((opt) => {
+          opt.classList.remove("active");
+        });
+
+        // Add active class to selected size
+        sizeOption.classList.add("active");
+        this.currentSize = sizeOption.dataset.sizeName;
+
+        console.log("Selected size:", this.currentSize);
+      }
+
+      selectColor(colorOption) {
+        // Remove active class from all color options
+        document.querySelectorAll(".color-option").forEach((opt) => {
+          opt.classList.remove("active");
+        });
+        document
+          .querySelectorAll(".color-swatch-wrapper")
+          .forEach((wrapper) => {
+            wrapper.classList.remove("active");
+          });
+
+        // Add active class to selected color
+        colorOption.classList.add("active");
+        const swatchWrapper = colorOption.querySelector(
+          ".color-swatch-wrapper"
+        );
+        if (swatchWrapper) {
+          swatchWrapper.classList.add("active");
+        }
+
+        this.currentColor = colorOption.dataset.colorName;
+
+        console.log("Selected color:", this.currentColor);
+      }
+
+      selectOffer(offerOption) {
+        // Remove active class from all offer options
+        document.querySelectorAll(".offer-option").forEach((opt) => {
+          opt.classList.remove("active");
+        });
+
+        // Add active class to selected offer
+        offerOption.classList.add("active");
+        this.currentOffer = offerOption.dataset.offerName;
+
+        console.log("Selected offer:", this.currentOffer);
+
+        // Update add to cart button with smooth transition
+        this.batchUpdateAddToCartButton();
+      }
+
+      batchUpdateAddToCartButton() {
+        // Prevent multiple simultaneous updates
+        if (this.updatePending) return;
+
+        this.updatePending = true;
+        requestAnimationFrame(() => {
+          this.updateAddToCartButton();
+          this.updatePending = false;
+        });
+      }
+
+      updateAddToCartButton() {
+        const config = productConfig.offers[this.currentOffer];
+        if (!config) return;
+
+        const addToCartBtn = document.querySelector(".add-to-cart-btn");
+        if (!addToCartBtn) return;
+
+        // Update button text and price smoothly
+        const buttonTextSpan = addToCartBtn.querySelector("span");
+        const priceSpan = addToCartBtn.querySelector("[data-cc-price]");
+
+        if (buttonTextSpan && priceSpan) {
+          // Smooth transition
+          addToCartBtn.style.transition = "opacity 0.2s ease";
+          addToCartBtn.style.opacity = "0.8";
+
+          setTimeout(() => {
+            buttonTextSpan.innerHTML = `Add to Cart - <span data-cc-check-decimal="true" data-cc-price="${config.numericPrice}">${config.price}</span>`;
+            priceSpan.textContent = config.price;
+            priceSpan.dataset.ccPrice = config.numericPrice;
+
+            addToCartBtn.style.opacity = "1";
+          }, 100);
+        }
+      }
+
+      handleAddToCart() {
+        const config = productConfig.offers[this.currentOffer];
+
+        if (!config) {
+          console.error("No offer configuration found for:", this.currentOffer);
+          return;
+        }
+
+        // Show loading state
+        const addToCartBtn = document.querySelector(".add-to-cart-btn");
+        if (addToCartBtn) {
+          addToCartBtn.style.opacity = "0.6";
+          addToCartBtn.style.pointerEvents = "none";
+
+          // Add loading text
+          const buttonText = addToCartBtn.querySelector("span");
+          if (buttonText) {
+            buttonText.innerHTML = "Adding to Cart...";
+          }
+        }
+
+        // Create URL with all variant information
+        const baseUrl = config.url;
+        const params = new URLSearchParams({
+          size: this.currentSize,
+          color: this.currentColor,
+          offer: this.currentOffer,
+          price: config.numericPrice,
+          quantity: config.quantity,
+        });
+
+        const finalUrl = `${baseUrl}?${params.toString()}`;
+
+        // Log selection for debugging
+        console.log("Add to Cart Details:");
+        console.log("Size:", this.currentSize);
+        console.log("Color:", this.currentColor);
+        console.log("Offer:", this.currentOffer);
+        console.log("Price:", config.price);
+        console.log("Quantity:", config.quantity);
+        console.log("Redirecting to:", finalUrl);
+
+        // Redirect after brief loading
+        setTimeout(() => {
+          window.location.href = finalUrl;
+        }, 800);
+      }
+
+      // Public method to get current configuration
+      getCurrentConfiguration() {
+        const config = productConfig.offers[this.currentOffer];
+        return {
+          size: this.currentSize,
+          color: this.currentColor,
+          offer: this.currentOffer,
+          price: config?.price,
+          numericPrice: config?.numericPrice,
+          url: config?.url,
+          quantity: config?.quantity,
+        };
+      }
+
+      // Public method to programmatically set selections
+      setConfiguration(size, color, offer) {
+        if (size && productConfig.sizes.includes(size)) {
+          const sizeElement = document.querySelector(
+            `[data-size-name="${size}"]`
+          );
+          if (sizeElement) this.selectSize(sizeElement);
+        }
+
+        if (color && productConfig.colors.includes(color)) {
+          const colorElement = document.querySelector(
+            `[data-color-name="${color}"]`
+          );
+          if (colorElement) this.selectColor(colorElement);
+        }
+
+        if (offer && productConfig.offers[offer]) {
+          const offerElement = document.querySelector(
+            `[data-offer-name="${offer}"]`
+          );
+          if (offerElement) this.selectOffer(offerElement);
+        }
+      }
+    }
+
+    // Initialize the system when DOM is ready
+    document.addEventListener("DOMContentLoaded", () => {
+      window.productConfigurator = new ProductConfiguratorSystem();
+    });
+
+    // Also initialize immediately if DOM is already loaded
+    if (document.readyState !== "loading") {
+      window.productConfigurator = new ProductConfiguratorSystem();
+    }
+  </script>
 </html>
