@@ -7996,26 +7996,47 @@
     const productConfig = {
       offers: {
         "1 PuppyPad": {
-          price: "$29.99",
+          price: "£29.99",
           numericPrice: 29.99,
-          url: "/checkout/single-pad",
           quantity: 1,
+          urls: {
+            "Small-Gray": "/checkout/single-small-gray",
+            "Small-White": "/checkout/single-small-white",
+            "Medium-Gray": "/checkout/single-medium-gray",
+            "Medium-White": "/checkout/single-medium-white",
+            "Large-Gray": "/checkout/single-large-gray",
+            "Large-White": "/checkout/single-large-white",
+          },
         },
         "Buy 3 Get 3 Free": {
-          price: "$49.99",
+          price: "£49.99",
           numericPrice: 49.99,
-          originalPrice: "$300",
-          savings: "$250.01",
-          url: "/checkout/buy3-get3",
+          originalPrice: "£300",
+          savings: "£250.01",
           quantity: 6,
+          urls: {
+            "Small-Gray": "/checkout/buy3get3-small-gray",
+            "Small-White": "/checkout/buy3get3-small-white",
+            "Medium-Gray": "/checkout/buy3get3-medium-gray",
+            "Medium-White": "/checkout/buy3get3-medium-white",
+            "Large-Gray": "/checkout/buy3get3-large-gray",
+            "Large-White": "/checkout/buy3get3-large-white",
+          },
         },
         "Buy 2 Get 1 Free": {
-          price: "$39.99",
+          price: "£39.99",
           numericPrice: 39.99,
-          originalPrice: "$150",
-          savings: "$110.01",
-          url: "/checkout/buy2-get1",
+          originalPrice: "£150",
+          savings: "£110.01",
           quantity: 3,
+          urls: {
+            "Small-Gray": "/checkout/buy2get1-small-gray",
+            "Small-White": "/checkout/buy2get1-small-white",
+            "Medium-Gray": "/checkout/buy2get1-medium-gray",
+            "Medium-White": "/checkout/buy2get1-medium-white",
+            "Large-Gray": "/checkout/buy2get1-large-gray",
+            "Large-White": "/checkout/buy2get1-large-white",
+          },
         },
       },
       sizes: ["Small", "Medium", "Large"],
@@ -8071,7 +8092,7 @@
           // Update the data-price attribute
           option.dataset.price = config.numericPrice;
 
-          // Update main price
+          // Update main price (convert $ to £)
           const mainPriceSpan = option.querySelector(
             ".offer-price [data-cc-price]"
           );
@@ -8080,20 +8101,22 @@
             mainPriceSpan.dataset.ccPrice = config.numericPrice;
           }
 
-          // Update compare price if exists
+          // Update compare price if exists (convert $ to £)
           const comparePriceSpan = option.querySelector(
             ".compare-price [data-cc-price]"
           );
           if (comparePriceSpan && config.originalPrice) {
-            comparePriceSpan.textContent = config.originalPrice;
+            const poundPrice = config.originalPrice;
+            comparePriceSpan.textContent = poundPrice;
           }
 
-          // Update savings if exists
+          // Update savings if exists (convert $ to £)
           const savingsSpan = option.querySelector(
             ".saving-tag [data-cc-price]"
           );
           if (savingsSpan && config.savings) {
-            savingsSpan.textContent = config.savings;
+            const poundSavings = config.savings;
+            savingsSpan.textContent = poundSavings;
           }
         });
       }
@@ -8242,22 +8265,29 @@
         const addToCartBtn = document.querySelector(".add-to-cart-btn");
         if (!addToCartBtn) return;
 
-        // Update button text and price smoothly
+        // Update button text and price without flickering
         const buttonTextSpan = addToCartBtn.querySelector("span");
-        const priceSpan = addToCartBtn.querySelector("[data-cc-price]");
 
-        if (buttonTextSpan && priceSpan) {
-          // Smooth transition
-          addToCartBtn.style.transition = "opacity 0.2s ease";
-          addToCartBtn.style.opacity = "0.8";
+        if (buttonTextSpan) {
+          // Update the inner HTML without causing flicker
+          // Find the existing price span to avoid recreating it
+          let priceSpan = buttonTextSpan.querySelector("[data-cc-price]");
 
-          setTimeout(() => {
-            buttonTextSpan.innerHTML = `Add to Cart - <span data-cc-check-decimal="true" data-cc-price="${config.numericPrice}">${config.price}</span>`;
+          if (priceSpan) {
+            // Just update the existing price span
             priceSpan.textContent = config.price;
             priceSpan.dataset.ccPrice = config.numericPrice;
+            priceSpan.dataset.ccCheckDecimal = "true";
+          } else {
+            // Create the price span if it doesn't exist
+            buttonTextSpan.innerHTML = `Add to Cart - <span data-cc-check-decimal="true" data-cc-price="${config.numericPrice}">${config.price}</span>`;
+          }
 
-            addToCartBtn.style.opacity = "1";
-          }, 100);
+          // Ensure the main button text stays as "Add to Cart"
+          const textContent = buttonTextSpan.textContent;
+          if (!textContent.includes("Add to Cart")) {
+            buttonTextSpan.innerHTML = `Add to Cart - <span data-cc-check-decimal="true" data-cc-price="${config.numericPrice}">${config.price}</span>`;
+          }
         }
       }
 
@@ -8266,6 +8296,15 @@
 
         if (!config) {
           console.error("No offer configuration found for:", this.currentOffer);
+          return;
+        }
+
+        // Get the specific URL for this combination
+        const variantKey = `${this.currentSize}-${this.currentColor}`;
+        const specificUrl = config.urls[variantKey];
+
+        if (!specificUrl) {
+          console.error("No URL found for combination:", variantKey);
           return;
         }
 
@@ -8282,18 +8321,6 @@
           }
         }
 
-        // Create URL with all variant information
-        const baseUrl = config.url;
-        const params = new URLSearchParams({
-          size: this.currentSize,
-          color: this.currentColor,
-          offer: this.currentOffer,
-          price: config.numericPrice,
-          quantity: config.quantity,
-        });
-
-        const finalUrl = `${baseUrl}?${params.toString()}`;
-
         // Log selection for debugging
         console.log("Add to Cart Details:");
         console.log("Size:", this.currentSize);
@@ -8301,25 +8328,28 @@
         console.log("Offer:", this.currentOffer);
         console.log("Price:", config.price);
         console.log("Quantity:", config.quantity);
-        console.log("Redirecting to:", finalUrl);
+        console.log("Variant Key:", variantKey);
+        console.log("Redirecting to:", specificUrl);
 
         // Redirect after brief loading
         setTimeout(() => {
-          window.location.href = finalUrl;
+          window.location.href = specificUrl;
         }, 800);
       }
 
       // Public method to get current configuration
       getCurrentConfiguration() {
         const config = productConfig.offers[this.currentOffer];
+        const variantKey = `${this.currentSize}-${this.currentColor}`;
         return {
           size: this.currentSize,
           color: this.currentColor,
           offer: this.currentOffer,
           price: config?.price,
           numericPrice: config?.numericPrice,
-          url: config?.url,
+          url: config?.urls[variantKey],
           quantity: config?.quantity,
+          variantKey: variantKey,
         };
       }
 
